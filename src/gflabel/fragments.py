@@ -1186,6 +1186,126 @@ class _electrical_symbol_fragment(Fragment):
         return _sketch.sketch.translate(-bb.center()).scale(height / bb.size.Y)
 
 
+@functools.cache
+def tech_icons_manifest() -> list[ManifestItem]:
+    """Load the manifest for Material Design tech icons."""
+    with (
+        importlib.resources.files("gflabel")
+        .joinpath("resources")
+        .joinpath("mdi-tech-icons.zip")
+        .open("rb") as f
+    ):
+        zip = zipfile.ZipFile(f)
+        return json.loads(zip.read("manifest.json"))
+
+
+def _match_tech_icon_with_selectors(selectors: Iterable[str]) -> ManifestItem:
+    """
+    Match a tech icon in the MDI manifest.
+
+    Returns:
+        The manifest entry. If no result, a ValueError will be raised.
+    """
+    requested = set(
+        x.lower()
+        .removesuffix(".svg")
+        .removesuffix(".png")
+        .removesuffix(".jpg")
+        for x in selectors
+    )
+
+    manifest = tech_icons_manifest()
+
+    # First, try exact ID, name, or filename match
+    matches = [
+        x
+        for x in manifest
+        if {
+            x["name"].lower(),
+            x["id"].lower(),
+            x["filename"].lower(),
+        }
+        & requested
+    ]
+    if len(matches) == 1:
+        logger.debug("Found exact tech icon match: %s", repr(matches[0]["id"]))
+        return matches[0]
+
+    if not matches:
+        # Try fuzzy matching using tags and category
+        logger.debug("No exact matches, using fuzzy matches with tags")
+        match_tokens = set(itertools.chain(*[x.split("-") for x in requested]))
+        logger.debug(f"Using match tokens: {match_tokens!r}")
+        
+        for icon in manifest:
+            # Create a pool of searchable terms
+            search_pool = set(
+                itertools.chain(
+                    icon["category"].lower().split(),
+                    icon["name"].lower().split(),
+                    icon["id"].lower().split("-"),
+                    icon.get("tags", []),
+                )
+            )
+            # Match if all requested tokens are found
+            if all(any(token in term for term in search_pool) for token in match_tokens):
+                logger.debug(f"    {icon['id']} matched!")
+                matches.append(icon)
+
+    if len(matches) == 1:
+        logger.debug("Found fuzzy tech icon match: %s", repr(matches[0]["id"]))
+        return matches[0]
+
+    if not matches:
+        raise InvalidFragmentSpecification(
+            f"Could find no tech icon matches for '{','.join(requested)}'"
+        )
+
+    # Multiple matches - show options
+    if matches:
+        cols = ["ID", "Name", "Category"]
+        logger.error(
+            f"Could not decide on tech icon from specification \"{','.join(requested)}\". Possible options:"
+            + "\n"
+            + "\n".join(
+                format_table(
+                    cols,
+                    [{"id": m["id"], "name": m["name"], "category": m["category"]} for m in matches],
+                    lambda x: x.lower(),
+                    prefix="    "
+                )
+            ),
+            extra={"markup": "True"},
+        )
+    raise InvalidFragmentSpecification("Please specify tech icon more precisely.")
+
+
+@fragment("techicon", "tech", "icon")
+class _tech_icon_fragment(Fragment):
+    """Render a computer/audio-visual technology icon (USB, HDMI, etc)."""
+
+    def __init__(self, *selectors: str):
+        self.icon = _match_tech_icon_with_selectors(selectors)
+
+        with (
+            importlib.resources.files("gflabel")
+            .joinpath("resources/mdi-tech-icons.zip")
+            .open("rb") as f
+        ):
+            zip = zipfile.ZipFile(f)
+            svg_data = io.StringIO(
+                zip.read("SVG/" + self.icon["filename"] + ".svg").decode()
+            )
+            self.shapes = import_svg(svg_data, flip_y=False)
+
+    def render(self, height: float, maxsize: float, options: RenderOptions) -> Sketch:
+        with BuildSketch() as _sketch:
+            add(self.shapes)
+        bb = _sketch.sketch.bounding_box()
+        # Resize to match requested height and center
+        return _sketch.sketch.translate(-bb.center()).scale(height / bb.size.Y)
+
+
 @fragment("|")
 class SplitterFragment(Fragment):
     """Denotes a column edge, where the label should be split. You can specify relative proportions for the columns, as well as specifying the column alignment."""

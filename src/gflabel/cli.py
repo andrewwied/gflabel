@@ -103,6 +103,31 @@ class ListSymbolsAction(argparse.Action):
         sys.exit(0)
 
 
+class ListTechIconsAction(argparse.Action):
+    def __init__(self, option_strings, dest, nargs=None, **kwargs):
+        if nargs is not None:
+            raise ValueError("nargs not allowed")
+        super().__init__(option_strings, dest, nargs=0, **kwargs)
+
+    def __call__(
+        self,
+        parser: ArgumentParser,
+        namespace: argparse.Namespace,
+        values: str | Sequence[Any] | None,
+        option_string: str | None = None,
+    ) -> None:
+        manifest = fragments.tech_icons_manifest()
+        cols = ["ID", "Name", "Category"]
+        table = rich.table.Table(*cols)
+        for icon in manifest:
+            table.add_row(icon["id"], icon["name"], icon["category"])  # type: ignore
+        rich.print(table)
+        rich.print(
+            "\nTech Icons from Material Design Icons with MIT License https://github.com/Templarian/MaterialDesign"
+        )
+        sys.exit(0)
+
+
 class BaseChoiceAction(argparse.Action):
     """ArgumentParser Action to allow choice field with deprecated (hidden) options"""
 
@@ -285,6 +310,11 @@ def run(argv: list[str] | None = None):
         "--list-symbols",
         help="List all available electronic symbols",
         action=ListSymbolsAction,
+    )
+    parser.add_argument(
+        "--list-tech-icons",
+        help="List all available tech/AV icons (USB, HDMI, etc.)",
+        action=ListTechIconsAction,
     )
     parser.add_argument(
         "--label-gap",
