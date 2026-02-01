@@ -44,6 +44,7 @@ from .bases.modern import ModernBase
 from .bases.none import NoneBase
 from .bases.plain import PlainBase
 from .bases.pred import PredBase, PredBoxBase
+from .bases.screwunit import ScrewUnitBase
 from .bases.tailor import TailorBoxBase
 from .label import render_divided_label
 from .options import LabelStyle, RenderOptions
@@ -146,6 +147,7 @@ class BaseChoiceAction(argparse.Action):
             "predbox",
             "tailorbox",
             "modern",
+            "screwunit",
         ]
 
         if values not in choices:
@@ -180,6 +182,7 @@ def base_name_to_subclass(name: str) -> type[LabelBase]:
         "tailorbox": TailorBoxBase,
         "plain": PlainBase,
         "none": NoneBase,
+        "screwunit": ScrewUnitBase,
         None: NoneBase,
     }
     if name not in bases:
@@ -200,7 +203,7 @@ def run(argv: list[str] | None = None):
     parser.add_argument(
         "base",
         metavar="BASE",
-        help="Label base to generate onto (pred, plain, none, cullenect, predbox, tailorbox, modern).",
+        help="Label base to generate onto (pred, plain, none, cullenect, predbox, tailorbox, modern, screwunit).",
         action=BaseChoiceAction,
     )
     parser.add_argument(
@@ -349,6 +352,13 @@ def run(argv: list[str] | None = None):
         "--version",
         help="The version of geometry to use for a given label system (if a system has versions). [Default: latest]",
         default="latest",
+    )
+    parser.add_argument(
+        "--screwunit-size",
+        help="ScrewUnit label size: 'small' (23x13mm) or 'wide' (53x13mm). Only used with screwunit base. [Default: %(default)s]",
+        choices=["small", "wide"],
+        default="small",
+        type=str,
     )
     args = parser.parse_args(argv)
 
